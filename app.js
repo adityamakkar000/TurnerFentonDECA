@@ -13,6 +13,7 @@ const getName = require("./nameTruncator") //profile name simplifier
 const speakeasy = require('speakeasy'); //verification token
 const querystring = require('querystring');
 const { time } = require('console');
+const e = require('connect-flash');
 const app = express();
 const MongoDBStore = require('connect-mongodb-session')(session);
 const port = process.env.PORT || 5000;
@@ -434,55 +435,73 @@ app.post("/choice", async (req, res) => {
 
   try {
     var cluster = req.body.cluster;
-    var questionNumbers = req.body.question;
-    var timeLimit = req.body.timeLimit;
-    var questionsToRender = [];
+    var date = new Date();
+    //set the date for the exam on august 10th at 10am
+    var examDate = new Date(2023, 7, 10, 10, 0, 0, 0);
+    console.log(date + "   " + examDate)
 
-    function getRandomNumber(min, max) {
-      return Math.floor(Math.random() * (max - min + 1)) + min;
-    }
+    if(cluster == "EE"){
+      console.log("check one")
+      //Check if the current date is after/equal to the exam date
+      if (date >= examDate) {
+        
+        console.log("exam date has passed")
+      } else {
 
-    function checkIfNumberIsInArray(number, array) {
-      for (var i = 0; i < array.length; i++) {
-        if (array[i] == number) {
-          return true;
-        }
+        res.redirect("/choice")
       }
-      return false
-    }
+    } else{
 
-    const db = cluster + "Question"
-    var length = await mongoose.model(db).estimatedDocumentCount();
-    const questions = await mongoose.model(db).find({}).exec();
+      var questionNumbers = req.body.question;
+      var timeLimit = req.body.timeLimit;
+      var questionsToRender = [];
 
-    const populateQuestions = async () => {
-      const hundredQuestions = [];
-      chosen = [];
-      for (var i = 0; i < questionNumbers; i++) {
-        randomNumber = getRandomNumber(0, length - 1);
-        var numberChosen = checkIfNumberIsInArray(randomNumber, chosen);
-        while (numberChosen) {
+      function getRandomNumber(min, max) {
+        return Math.floor(Math.random() * (max - min + 1)) + min;
+      }
+
+      function checkIfNumberIsInArray(number, array) {
+        for (var i = 0; i < array.length; i++) {
+          if (array[i] == number) {
+            return true;
+          }
+        }
+        return false
+      }
+
+      const db = cluster + "Question"
+      var length = await mongoose.model(db).estimatedDocumentCount();
+      const questions = await mongoose.model(db).find({}).exec();
+
+      const populateQuestions = async () => {
+        const hundredQuestions = [];
+        chosen = [];
+        for (var i = 0; i < questionNumbers; i++) {
           randomNumber = getRandomNumber(0, length - 1);
-          numberChosen = checkIfNumberIsInArray(randomNumber, chosen);
+          var numberChosen = checkIfNumberIsInArray(randomNumber, chosen);
+          while (numberChosen) {
+            randomNumber = getRandomNumber(0, length - 1);
+            numberChosen = checkIfNumberIsInArray(randomNumber, chosen);
+          }
+          chosen.push(randomNumber);
+          hundredQuestions.push(questions[randomNumber]._id);
         }
-        chosen.push(randomNumber);
-        hundredQuestions.push(questions[randomNumber]._id);
-      }
-      return hundredQuestions;
-    };
+        return hundredQuestions;
+      };
 
 
-    questionsToRender = await populateQuestions();
-    const time = new Date().getTime();
-    console.log(time)
-    const queryParams = querystring.stringify({
-      questionIds: JSON.stringify(questionsToRender),
-      number: JSON.stringify(questionNumbers),
-      db: JSON.stringify(cluster + "Question"),
-      timer: JSON.stringify(timeLimit === 'none' ? "false" : "true"),
-      time: JSON.stringify(time)
-    })
-    res.redirect("/questions?" + queryParams);
+      questionsToRender = await populateQuestions();
+      const time = new Date().getTime();
+      console.log(time)
+      const queryParams = querystring.stringify({
+        questionIds: JSON.stringify(questionsToRender),
+        number: JSON.stringify(questionNumbers),
+        db: JSON.stringify(cluster + "Question"),
+        timer: JSON.stringify(timeLimit === 'none' ? "false" : "true"),
+        time: JSON.stringify(time)
+      })
+      res.redirect("/questions?" + queryParams);
+    }
   } catch (error) {
     console.log(error)
     res.redirect("/")
